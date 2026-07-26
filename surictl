@@ -85,39 +85,44 @@ danger_option() {
     printf "%b\n" "${RED}$1)${RESET} $2"
 }
 
-# ========= FUNCIONES DEL PROGRAMA =========
-#
+# ======================================================
 # STATUS SURICATA
+# ======================================================
 
 activar_suricata() {
+
     clear
     logo
     title
     subtitle "Activando Suricata"
-    printf "\n"
+
     if sudo systemctl start suricata; then
         ok "Suricata activado."
     else
         error "No se pudo activar Suricata."
     fi
+
     pause
 }
 
 desactivar_suricata() {
+
     clear
     logo
     title
     subtitle "Desactivando Suricata"
-    printf "\n"
+
     if sudo systemctl stop suricata; then
         ok "Suricata desactivado."
     else
         error "No se pudo desactivar Suricata."
     fi
+
     pause
 }
 
 ver_estado() {
+
     clear
     logo
     title
@@ -128,48 +133,73 @@ ver_estado() {
 
     printf "%b\n" "${BOLD}Servicio:${RESET} suricata"
 
-    if [[ "$estado" == "active" ]]; then
-        printf "%b\n" "${BOLD}Estado:${RESET} ${GREEN}active (running)${RESET}"
-    elif [[ "$estado" == "inactive" ]]; then
-        printf "%b\n" "${BOLD}Estado:${RESET} ${YELLOW}inactive (dead)${RESET}"
-    else
-        printf "%b\n" "${BOLD}Estado:${RESET} ${RED}$estado${RESET}"
-    fi
+    case "$estado" in
 
-    if [[ "$inicio" == "enabled" ]]; then
-        printf "%b\n" "${BOLD}Inicio automático:${RESET} ${GREEN}enabled${RESET}"
-    elif [[ "$inicio" == "disabled" ]]; then
-        printf "%b\n" "${BOLD}Inicio automático:${RESET} ${YELLOW}disabled${RESET}"
-    else
-        printf "%b\n" "${BOLD}Inicio automático:${RESET} ${RED}$inicio${RESET}"
-    fi
+        active)
+            printf "%b\n" "${BOLD}Estado:${RESET} ${GREEN}active (running)${RESET}"
+            ;;
+
+        inactive)
+            printf "%b\n" "${BOLD}Estado:${RESET} ${YELLOW}inactive (dead)${RESET}"
+            ;;
+
+        *)
+            printf "%b\n" "${BOLD}Estado:${RESET} ${RED}$estado${RESET}"
+            ;;
+
+    esac
+
+    case "$inicio" in
+
+        enabled)
+            printf "%b\n" "${BOLD}Inicio automático:${RESET} ${GREEN}enabled${RESET}"
+            ;;
+
+        disabled)
+            printf "%b\n" "${BOLD}Inicio automático:${RESET} ${YELLOW}disabled${RESET}"
+            ;;
+
+        *)
+            printf "%b\n" "${BOLD}Inicio automático:${RESET} ${RED}$inicio${RESET}"
+            ;;
+
+    esac
 
     printf "\n"
+
     small_line
-    info "Vista resumida del servicio:"
+    info "Vista resumida del servicio"
     small_line
 
     systemctl status suricata --no-pager | awk '
-    /suricata.service;/ {
-        gsub(";", "", $4)
-        print "Loaded:", $4
-    }
-    /Active:/ {
-        gsub(",", "", $3)
-        print "Active:", $2, $3
-    }'
+
+        /suricata.service;/ {
+
+            gsub(";", "", $4)
+            print "Loaded :", $4
+
+        }
+
+        /Active:/ {
+
+            gsub(",", "", $3)
+            print "Active :", $2, $3
+
+        }
+
+    '
 
     pause
 }
 
 reiniciar_suricata() {
+
     clear
     logo
     title
     subtitle "Reiniciar Suricata"
 
-    info "Reiniciando servicio Suricata..."
-    printf "\n"
+    info "Reiniciando servicio..."
 
     if sudo systemctl restart suricata; then
         ok "Suricata reiniciado correctamente."
@@ -181,69 +211,87 @@ reiniciar_suricata() {
 }
 
 test_suricata() {
+
     clear
     logo
     title
-    subtitle "Test de configuración"
+    subtitle "Validar configuración"
 
-    info "Probando configuración y reglas..."
-    printf "\n"
+    info "Comprobando configuración y reglas..."
 
-    if sudo suricata -T -c "$SURICATA_CONF" -v | awk '/Notice: suricata: Configuration provided was successfully loaded. Exiting./ { print $3 " " $5 " " $6 " " $7 }'; then
-        printf "\n"
+    if sudo suricata -T -c "$SURICATA_CONF" -v |
+        awk '/Notice: suricata: Configuration provided was successfully loaded. Exiting./ { print $3 " " $5 " " $6 " " $7 }'
+    then
+
         ok "Configuración aprobada."
+
     else
-        printf "\n"
-        error "La configuración tiene errores."
+
+        error "La configuración contiene errores."
+
     fi
 
     pause
 }
 
 status_suricata() {
-    clear
-    logo
-    title
-    printf "\n"
-    small_line
-    printf "\n"
 
-    option "1" "Ver status actual de Suricata"
-    option "2" "Activar Suricata"
-    option "3" "Desactivar Suricata"
-    option "4" "Reiniciar Suricata"
-    option "5" "Depurar Suricata"
-    danger_option "0" "Volver al menú principal"
-    printf "\n"
-    small_line
-    printf "\n"
+    while true; do
 
-    read -p "Seleccione una opción: " option
+        clear
+        logo
+        title
 
-    case "$option" in
-        1)
-            ver_estado
-            ;;
-        2)
-            activar_suricata
-            ;;
-        3)
-            desactivar_suricata
-            ;;
-        4)
-            reiniciar_suricata
-            ;;
-        5)
-            test_suricata
-            ;;
-        0)
-            break
-            ;;
-        *)
-            error "Opción inválida."
-            sleep 1
-            ;;
-    esac
+        printf "\n%b\n" "${BOLD}${WHITE}                 STATUS SURICATA${RESET}"
+        small_line
+
+        option "1" "Ver estado actual"
+        option "2" "Activar Suricata"
+        option "3" "Desactivar Suricata"
+        option "4" "Reiniciar Suricata"
+        option "5" "Validar configuración"
+
+        danger_option "0" "Volver al menú principal"
+
+        small_line
+        printf "\n"
+
+        read -rp "Selecciona una opción: " option
+
+        case "$option" in
+
+            1)
+                ver_estado
+                ;;
+
+            2)
+                activar_suricata
+                ;;
+
+            3)
+                desactivar_suricata
+                ;;
+
+            4)
+                reiniciar_suricata
+                ;;
+
+            5)
+                test_suricata
+                ;;
+
+            0)
+                break
+                ;;
+
+            *)
+                error "Opción inválida."
+                sleep 1
+                ;;
+
+        esac
+
+    done
 }
 
 # REGLAS SURICATA
