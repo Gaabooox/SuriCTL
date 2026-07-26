@@ -21,6 +21,7 @@ SURICATA_CONF="/etc/suricata/suricata.yaml"
 LOCAL_RULES="/var/lib/suricata/rules/local.rules"
 EVE_LOG="/var/log/suricata/eve.json"
 FAST_LOG="/var/log/suricata/fast.log"
+STATS_LOG="/var/log/suricata/stats.log"
 # ========= FUNCIONES VISUALES =========
 
 line() {
@@ -566,19 +567,876 @@ siguiente_sid() {
     fi
 }
 
+#----------------—------------ LOGS ------------------------------------------------------
+# Muestra el LOG de Suricata.
+#
+ver_alertas() {
+
+    clear
+    logo
+    title
+
+    subtitle "Últimas alertas detectadas"
+
+    if [[ ! -r "$EVE_LOG" ]]; then
+        error "No se puede leer eve.json."
+        pause
+        return
+    fi
+
+
+    info "Mostrando últimas 20 alertas..."
+    printf "\n"
+
+    sudo grep '"event_type":"alert"' "$EVE_LOG" | tail -20 | less
+
+
+    pause
+}
+
+ver_eventos_live() {
+
+    clear
+    logo
+    title
+
+    subtitle "Eventos en tiempo real"
+
+    info "Monitoreando eve.json"
+    warn "CTRL+C para salir"
+
+    printf "\n"
+
+    sudo tail -f "$EVE_LOG"
+
+}
+
+buscar_ip() {
+
+    clear
+    logo
+    title
+
+    subtitle "Buscar IP en eventos"
+
+    read -rp "IP a buscar: " ip
+
+
+    if [[ -z "$ip" ]]; then
+        error "No ingresaste ninguna IP."
+        pause
+        return
+    fi
+
+
+    printf "\n"
+
+    info "Buscando $ip..."
+
+    printf "\n"
+
+
+    sudo grep "$ip" "$EVE_LOG" | tail -50 | less
+
+
+    pause
+}
+
+ver_stats() {
+
+    clear
+    logo
+    title
+
+    subtitle "Estadísticas Suricata"
+
+
+    if [[ ! -f "$STATS_LOG" ]]; then
+        error "No existe stats.log."
+        pause
+        return
+    fi
+
+
+    sudo tail -50 "$STATS_LOG" | less
+
+
+    pause
+}
+
+abrir_logs() {
+
+    while true; do
+
+        clear
+        logo
+        title
+
+        subtitle "Abrir logs Suricata"
+
+        option "1" "Abrir eve.json completo"
+        option "2" "Abrir eve.json formateado"
+        option "3" "Abrir fast.log"
+        option "4" "Abrir stats.log"
+
+        danger_option "0" "Volver"
+
+        printf "\n"
+
+        read -rp "Selecciona una opción: " abrir_option
+
+
+        case "$abrir_option" in
+
+            1)
+                sudo less "$EVE_LOG"
+                ;;
+
+            2)
+                if command -v jq >/dev/null; then
+                    sudo jq . "$EVE_LOG" | less
+                else
+                    error "jq no está instalado."
+                    info "Instala jq con: sudo dnf install jq"
+                    pause
+                fi
+                ;;
+
+            3)
+                sudo less "$FAST_LOG"
+                ;;
+
+            4)
+                sudo less "$STATS_LOG"
+                ;;
+
+            0)
+                break
+                ;;
+
+            *)
+                error "Opción inválida."
+                sleep 1
+                ;;
+
+        esac
+
+    done
+}
+
+logs_menu() {
+
+    while true; do
+
+        clear
+        logo
+        title
+
+        printf "\n%b\n" "${BOLD}${MAGENTA}                    MENU DE LOGS${RESET}"
+        small_line
+
+        option "1" "Ver últimas alertas (eve.json)"
+        option "2" "Ver eventos en vivo"
+        option "3" "Buscar IP en eventos"
+        option "4" "Ver estadísticas (stats.log)"
+        option "5" "Abrir logs"
+
+        danger_option "0" "Volver al menú principal"
+
+        small_line
+        printf "\n"
+
+        read -rp "Selecciona una opción: " log_option
+
+        case "$log_option" in
+
+            1)
+                ver_alertas
+                ;;
+
+            2)
+                ver_eventos_live
+                ;;
+
+            3)
+                buscar_ip
+                ;;
+
+            4)
+                ver_stats
+                ;;
+
+            5)
+                abrir_logs
+                ;;
+
+            0)
+                break
+                ;;
+
+            *)
+                error "Opción inválida."
+                sleep 1
+                ;;
+
+        esac
+
+    done
+}
+
+
+#-----------------------------------ALERTAS---------------------------------------------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+ver_ultimas_alertas() {
+
+    clear
+    logo
+    title
+
+    subtitle "Últimas alertas detectadas"
+
+
+    if [[ ! -r "$EVE_LOG" ]]; then
+
+        error "No se puede leer eve.json."
+        pause
+        return
+
+    fi
+
+
+    sudo grep '"event_type":"alert"' "$EVE_LOG" | tail -20 | jq '
+    {
+        fecha:.timestamp,
+        firma:.alert.signature,
+        sid:.alert.signature_id,
+        severidad:.alert.severity,
+        origen:.src_ip,
+        destino:.dest_ip,
+        protocolo:.proto
+    }'
+
+
+    pause
+}
+
+buscar_alerta() {
+
+    clear
+    logo
+    title
+
+    subtitle "Buscar alerta"
+
+
+    read -rp "Texto a buscar: " busqueda
+
+
+    if [[ -z "$busqueda" ]]; then
+        error "Campo vacío."
+        pause
+        return
+    fi
+
+
+    sudo grep -i \
+    '"event_type":"alert"' "$EVE_LOG" | grep -i "$busqueda" | jq
+
+
+    pause
+}
+
+filtrar_severidad() {
+
+    clear
+    logo
+    title
+
+    subtitle "Filtrar severidad"
+
+
+    echo "1) Alta"
+    echo "2) Media"
+    echo "3) Baja"
+
+
+    read -rp "Severidad: " sev
+
+
+    sudo grep '"event_type":"alert"' "$EVE_LOG" | jq "
+    select(.alert.severity==$sev)
+    "
+
+
+    pause
+}
+
+filtrar_ip_alerta() {
+
+    clear
+    logo
+    title
+
+    subtitle "Buscar IP"
+
+
+    read -rp "IP: " ip
+
+
+    sudo grep "$ip" "$EVE_LOG" | jq
+
+
+    pause
+}
+
+detalle_alerta() {
+
+    clear
+    logo
+    title
+
+    subtitle "Detalle alerta"
+
+
+    read -rp "SID de alerta: " sid
+
+
+    sudo grep "$sid" "$EVE_LOG" | jq
+
+
+    pause
+}
+
+estadisticas_alertas() {
+
+    clear
+    logo
+    title
+
+    subtitle "Estadísticas"
+
+
+    total=$(sudo grep -c '"event_type":"alert"' "$EVE_LOG")
+
+
+    echo "Total alertas:"
+    echo "$total"
+
+
+    echo ""
+
+    echo "Top firmas:"
+
+
+    sudo grep '"event_type":"alert"' "$EVE_LOG" |
+    jq -r '.alert.signature' |
+    sort |
+    uniq -c |
+    sort -nr |
+    head
+
+
+    pause
+}
+
+exportar_alertas() {
+
+    clear
+    logo
+    title
+
+    subtitle "Exportar alertas"
+
+
+    archivo="alertas_$(date +%Y%m%d_%H%M).json"
+
+
+    sudo grep '"event_type":"alert"' "$EVE_LOG" > "$archivo"
+
+
+    ok "Exportado: $archivo"
+
+
+    pause
+}
+
+
+
+menu_alertas() {
+
+    while true; do
+
+        clear
+        logo
+        title
+
+        printf "\n%b\n" "${BOLD}${MAGENTA}                    MENU DE ALERTAS${RESET}"
+        small_line
+
+
+        option "1" "Ver últimas alertas"
+        option "2" "Buscar alerta"
+        option "3" "Filtrar por severidad"
+        option "4" "Filtrar por IP"
+        option "5" "Ver detalle de alerta"
+        option "6" "Estadísticas de alertas"
+        option "7" "Exportar alertas"
+
+
+        danger_option "0" "Volver al menú principal"
+
+
+        small_line
+        printf "\n"
+
+
+        read -rp "Selecciona una opción: " alerta_option
+
+
+        case "$alerta_option" in
+
+            1)
+                ver_ultimas_alertas
+                ;;
+
+            2)
+                buscar_alerta
+                ;;
+
+            3)
+                filtrar_severidad
+                ;;
+
+            4)
+                filtrar_ip_alerta
+                ;;
+
+            5)
+                detalle_alerta
+                ;;
+
+            6)
+                estadisticas_alertas
+                ;;
+
+            7)
+                exportar_alertas
+                ;;
+
+            0)
+                break
+                ;;
+
+            *)
+                error "Opción inválida."
+                sleep 1
+                ;;
+
+        esac
+
+    done
+}
+
+#-----------------------------------CONFIGURACION---------------------------------------------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+cambiar_interfaz() {
+
+    clear
+    logo
+    title
+
+    subtitle "Cambiar interfaz de captura"
+
+    info "Interfaces disponibles:"
+    printf "\n"
+
+    interfaces=$(ip -o link show | awk -F': ' '{print $2}' | grep -v "lo")
+
+    contador=1
+    declare -A lista_interfaces
+
+    while read -r iface; do
+
+        option "$contador" "$iface"
+        lista_interfaces[$contador]=$iface
+        ((contador++))
+
+    done <<< "$interfaces"
+
+
+    printf "\n"
+    danger_option "0" "Cancelar"
+
+    printf "\n"
+
+    read -rp "Selecciona interfaz: " interfaz_option
+
+
+    if [[ "$interfaz_option" == "0" ]]; then
+        return
+    fi
+
+
+    nueva_interfaz=${lista_interfaces[$interfaz_option]}
+
+
+    if [[ -z "$nueva_interfaz" ]]; then
+        error "Interfaz inválida."
+        pause
+        return
+    fi
+
+
+    info "Nueva interfaz: $nueva_interfaz"
+
+
+    sudo sed -i \
+    "s/interface: .*/interface: $nueva_interfaz/" \
+    "$SURICATA_CONF"
+
+
+    ok "Interfaz actualizada."
+
+    info "Reiniciando Suricata..."
+
+    sudo systemctl restart suricata
+
+
+    pause
+}
+
+abrir_configuracion() {
+
+    clear
+    logo
+    title
+
+    subtitle "Editar configuración Suricata"
+
+
+    warn "Modificar este archivo puede afectar el inicio de Suricata."
+
+    printf "\n"
+
+    read -rp "Presiona Enter para continuar..."
+
+    sudo nano "$SURICATA_CONF"
+
+
+    pause
+}
+
+ver_configuracion_actual() {
+
+    clear
+    logo
+    title
+
+    subtitle "Configuración actual"
+
+
+    version=$(suricata --build-info | grep Version | awk '{print $2}')
+
+    interfaz=$(sudo suricata --dump-config | grep "af-packet.0.interface" | awk '{print $3}')
+
+    home=$(sudo suricata --dump-config | grep "HOME_NET" | head -1 | cut -d'=' -f2)
+
+
+    echo "Versión:"
+    echo "$version"
+
+    echo ""
+
+    echo "Interfaz:"
+    echo "$interfaz"
+
+    echo ""
+
+    echo "HOME_NET:"
+    echo "$home"
+
+
+    echo ""
+
+    reglas=$(sudo grep -vE '^\s*#|^\s*$' "$LOCAL_RULES" | wc -l)
+
+    echo "Reglas locales:"
+    echo "$reglas"
+
+
+    echo ""
+
+    estado=$(systemctl is-active suricata)
+
+    echo "Estado:"
+    echo "$estado"
+
+
+    pause
+}
+
+validar_configuracion() {
+
+    clear
+    logo
+    title
+
+    subtitle "Validación Suricata"
+
+
+    info "Comprobando configuración..."
+
+
+    if sudo suricata -T -c "$SURICATA_CONF" -v; then
+
+        printf "\n"
+        ok "Configuración correcta."
+
+    else
+
+        printf "\n"
+        error "La configuración tiene errores."
+
+    fi
+
+
+    pause
+}
+
+configurar_home_net() {
+
+    clear
+    logo
+    title
+
+    subtitle "Configurar HOME_NET"
+
+
+    actual=$(sudo suricata --dump-config | grep "HOME_NET" | head -1)
+
+
+    info "Configuración actual:"
+    echo "$actual"
+
+
+    printf "\n"
+
+    read -rp "Nueva red/IP HOME_NET: " nueva_home
+
+
+    if [[ -z "$nueva_home" ]]; then
+
+        error "Valor vacío."
+        pause
+        return
+
+    fi
+
+
+    sudo sed -i \
+    "s/HOME_NET:.*/HOME_NET: \"$nueva_home\"/" \
+    "$SURICATA_CONF"
+
+
+    ok "HOME_NET actualizado."
+
+
+    pause
+}
+
+informacion_sistema() {
+
+    clear
+    logo
+    title
+
+    subtitle "Información del sistema"
+
+
+    echo "Sistema:"
+    uname -s
+
+
+    echo ""
+
+    echo "Kernel:"
+    uname -r
+
+
+    echo ""
+
+    echo "CPU:"
+    lscpu | grep "Model name" | cut -d':' -f2
+
+
+    echo ""
+
+    echo "Memoria:"
+    free -h | grep Mem
+
+
+    echo ""
+
+    echo "Suricata:"
+    suricata --build-info | grep Version
+
+
+    echo ""
+
+    echo "Interfaces:"
+    ip -br link
+
+
+    pause
+}
+
+
+
+menu_configuracion() {
+
+    while true; do
+
+        clear
+        logo
+        title
+
+        printf "\n%b\n" "${BOLD}${MAGENTA}                MENU DE CONFIGURACIÓN${RESET}"
+        small_line
+
+        option "1" "Cambiar interfaz de captura"
+        option "2" "Abrir suricata.yaml"
+        option "3" "Ver configuración actual"
+        option "4" "Validar configuración"
+        option "5" "Reiniciar Suricata"
+        option "6" "Configurar HOME_NET"
+
+        danger_option "0" "Volver al menú principal"
+
+        small_line
+        printf "\n"
+
+        read -rp "Selecciona una opción: " config_option
+
+
+        case "$config_option" in
+
+            1)
+                cambiar_interfaz
+                ;;
+
+            2)
+                abrir_configuracion
+                ;;
+
+            3)
+                ver_configuracion_actual
+                ;;
+
+            4)
+                validar_configuracion
+                ;;
+
+            5)
+                reiniciar_suricata
+                ;;
+
+            6)
+                configurar_home_net
+                ;;
+            0)
+                break
+                ;;
+
+            *)
+                error "Opción inválida."
+                sleep 1
+                ;;
+
+        esac
+
+    done
+}
+
+dashboard_inicio() {
+
+    version=$(suricata --build-info 2>/dev/null | grep "This is Suricata version" | awk '{print $5}')
+
+    if [[ -z "$version" ]]; then
+        version="Desconocida"
+    fi
+
+
+    modo=$(sudo suricata --dump-config 2>/dev/null | grep "engine-mode" | awk '{print $3}')
+
+    if [[ -z "$modo" ]]; then
+        modo="IDS"
+    fi
+
+
+    interfaz=$(sudo suricata --dump-config 2>/dev/null | grep "af-packet.0.interface" | awk '{print $3}')
+
+
+    reglas=$(sudo suricata --dump-config 2>/dev/null | grep "rule-files" -A20 | grep ".rules" | wc -l)
+
+
+    if [[ -f "$EVE_LOG" ]]; then
+
+        eventos=$(sudo wc -l < "$EVE_LOG")
+
+        alertas=$(sudo grep -c '"event_type":"alert"' "$EVE_LOG")
+
+    else
+
+        eventos=0
+        alertas=0
+
+    fi
+
+
+    clear
+    logo
+    title
+
+    printf "\n"
+
+    small_line
+
+    printf "%b\n" "${BOLD}${WHITE} INFORMACIÓN DEL SISTEMA ${RESET}"
+
+    small_line
+
+    printf "%b\n" "${BOLD}Versión:${RESET}        ${CYAN}$version${RESET}"
+    printf "%b\n" "${BOLD}Modo:${RESET}           ${GREEN}$modo${RESET}"
+    printf "%b\n" "${BOLD}Interfaz:${RESET}       ${BLUE}$interfaz${RESET}"
+    printf "%b\n" "${BOLD}Reglas:${RESET}         ${MAGENTA}$reglas cargadas${RESET}"
+
+    printf "\n"
+
+    small_line
+
+    printf "%b\n" "${BOLD}Eventos EVE:${RESET}    ${CYAN}$eventos${RESET}"
+    printf "%b\n" "${BOLD}Alertas:${RESET}        ${RED}$alertas${RESET}"
+
+    small_line
+
+    printf "\n"
+
+}
 
 main_menu() {
     while true; do
         clear
         logo
         title
-
+        dashboard_inicio
         printf "\n%b\n" "${BOLD}${WHITE}Selecciona una acción:${RESET}"
         small_line
         option "1" "Status de Suricata"
         option "2" "Reglas Suricata"
         option "3" "Logs Suricata"
-        option "4" "Advertencias"
+        option "4" "Alertas"
         option "5" "Configuración"
         danger_option "0" "Salir"
         small_line
@@ -597,10 +1455,10 @@ main_menu() {
                 logs_menu
                 ;;
             4)
-                advertencias
+                menu_alertas
                 ;;
             5)
-                editar_configuracion
+                menu_configuracion
                 ;;
             0)
                 clear
