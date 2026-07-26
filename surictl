@@ -19,7 +19,8 @@ RESET="\e[0m"
 # ========= RUTAS =========
 SURICATA_CONF="/etc/suricata/suricata.yaml"
 LOCAL_RULES="/var/lib/suricata/rules/local.rules"
-
+EVE_LOG="/var/log/suricata/eve.json"
+FAST_LOG="/var/log/suricata/fast.log"
 # ========= FUNCIONES VISUALES =========
 
 line() {
@@ -33,12 +34,12 @@ small_line() {
 logo() {
     printf "%b" "${CYAN}${BOLD}"
     cat << "EOF"
-   _____            _      _____ _______ _      
-  / ____|          (_)    / ____|__   __| |     
- | (___  _   _ _ __ _ ___| |       | |  | |     
-  \___ \| | | | '__| / __| |       | |  | |     
-  ____) | |_| | |  | \__ \ |____   | |  | |____ 
- |_____/ \__,_|_|  |_|___/\_____|  |_|  |______|
+   _____            _   _____ _______ _
+  / ____|          (_) / ____|__   __| |
+ | (___  _   _ _ __ _ | |       | |  | |
+  \___ \| | | | '__| || |       | |  | |
+  ____) | |_| | |  | |\ |____   | |  | |____
+ |_____/ \__,_|_|  |_| \_____|  |_|  |______|
 EOF
     printf "%b\n" "${RESET}"
 }
@@ -84,6 +85,36 @@ danger_option() {
 }
 
 # ========= FUNCIONES DEL PROGRAMA =========
+#
+# STATUS SURICATA
+
+activar_suricata() {
+    clear
+    logo
+    title
+    subtitle "Activando Suricata"
+    printf "\n"
+    if sudo systemctl start suricata; then
+        ok "Suricata activado."
+    else
+        error "No se pudo activar Suricata."
+    fi
+    pause
+}
+
+desactivar_suricata() {
+    clear
+    logo
+    title
+    subtitle "Desactivando Suricata"
+    printf "\n"
+    if sudo systemctl stop suricata; then
+        ok "Suricata desactivado."
+    else
+        error "No se pudo desactivar Suricata."
+    fi
+    pause
+}
 
 ver_estado() {
     clear
@@ -168,6 +199,54 @@ test_suricata() {
     pause
 }
 
+status_suricata() {
+    clear
+    logo
+    title
+    printf "\n"
+    small_line
+    printf "\n"
+
+    option "1" "Ver status actual de Suricata"
+    option "2" "Activar Suricata"
+    option "3" "Desactivar Suricata"
+    option "4" "Reiniciar Suricata"
+    option "5" "Depurar Suricata"
+    danger_option "0" "Volver al menú principal"
+    printf "\n"
+    small_line
+    printf "\n"
+
+    read -p "Seleccione una opción: " option
+
+    case "$option" in
+        1)
+            ver_estado
+            ;;
+        2)
+            activar_suricata
+            ;;
+        3)
+            desactivar_suricata
+            ;;
+        4)
+            reiniciar_suricata
+            ;;
+        5)
+            test_suricata
+            ;;
+        0)
+            break
+            ;;
+        *)
+            error "Opción inválida."
+            sleep 1
+            ;;
+    esac
+}
+
+# REGLAS SURICATA
+
 ver_todas_reglas() {
     clear
     logo
@@ -216,51 +295,23 @@ ver_reglas_inactivas() {
     pause
 }
 
-menu_reglas() {
-    while true; do
-        clear
-        logo
-        title
+validar_reglas() {
 
-        printf "\n%b\n" "${BOLD}${MAGENTA}                    MENU DE REGLAS${RESET}"
-        small_line
-        option "1" "Ver todas las reglas"
-        option "2" "Ver reglas activas"
-        option "3" "Ver reglas inactivas"
-        danger_option "0" "Volver al menú principal"
-        small_line
+    info "Validando reglas Suricata..."
+
+    if sudo suricata -T -c "$SURICATA_CONF" >/tmp/suricata_test.log 2>&1; then
+        ok "Reglas válidas."
+        return 0
+    else
+        error "Regla inválida."
+
+        printf "\n"
+        echo "Detalle del error:"
         printf "\n"
 
-        read -rp "Selecciona una opción: " opcion1
+        sudo cat /tmp/suricata_test.log
 
-        case "$opcion1" in
-            1)
-                ver_todas_reglas
-                ;;
-            2)
-                ver_reglas_activas
-                ;;
-            3)
-                ver_reglas_inactivas
-                ;;
-            0)
-                break
-                ;;
-            *)
-                error "Opción inválida."
-                sleep 1
-                ;;
-        esac
-    done
-}
-
-siguiente_sid() {
-    ultimo_sid=$(sudo grep -Eo 'sid:[0-9]+' "$LOCAL_RULES" 2>/dev/null | cut -d':' -f2 | sort -n | tail -n 1)
-
-    if [[ -z "$ultimo_sid" ]]; then
-        echo "1000001"
-    else
-        echo $((ultimo_sid + 1))
+        return 1
     fi
 }
 
@@ -273,7 +324,7 @@ agregar_regla() {
     next_sid=$(siguiente_sid)
 
     info "Escribe la regla que deseas agregar."
-    warn "Asegúrate de usar un SID único. El siguiente SID sugerido es: sid:${next_sid};"
+    warn "SID sugerido: sid:${next_sid};"
     printf "\n"
 
     read -rp "Nueva regla: " new_regla
@@ -284,24 +335,111 @@ agregar_regla() {
         return
     fi
 
-    printf "\n"
-    info "Agregando regla al archivo local.rules..."
+    TEMP_RULE="/tmp/local.rules.test"
 
-    if echo "$new_regla" | sudo tee -a "$LOCAL_RULES" >/dev/null; then
-        ok "Regla agregada."
-    else
-        error "No se pudo agregar la regla."
+    printf "\n"
+    info "Creando archivo temporal de prueba..."
+
+    sudo cp "$LOCAL_RULES" "$TEMP_RULE"
+
+    if [[ $? -ne 0 ]]; then
+        error "No se pudo crear la copia temporal."
         pause
         return
     fi
 
+
+    info "Probando nueva regla con Suricata..."
+
+    echo "$new_regla" | sudo tee -a "$TEMP_RULE" >/dev/null
+
+
+    if sudo suricata -T \
+        -c "$SURICATA_CONF" \
+        -S "$TEMP_RULE" \
+        >/tmp/suricata_test.log 2>&1
+    then
+
+        ok "La regla es válida."
+
+        printf "\n"
+        info "Guardando regla en local.rules..."
+
+        if sudo cp "$TEMP_RULE" "$LOCAL_RULES"; then
+            ok "Regla agregada correctamente."
+        else
+            error "No se pudo guardar la regla."
+            pause
+            return
+        fi
+
+
+        printf "\n"
+        info "Reiniciando Suricata..."
+
+        if sudo systemctl restart suricata; then
+            ok "Suricata reiniciado correctamente."
+        else
+            error "La regla fue guardada pero Suricata no pudo reiniciarse."
+        fi
+
+
+    else
+
+        error "La regla tiene errores y no fue agregada."
+
+        printf "\n"
+        small_line
+        printf "%b\n" "${RED}Error detectado:${RESET}"
+        small_line
+
+        sudo cat /tmp/suricata_test.log
+
+        small_line
+
+    fi
+
+
+    sudo rm -f /tmp/suricata_test.log
+    sudo rm -f "$TEMP_RULE"
+
+    pause
+}
+
+eliminar_regla() {
+    clear
+    logo
+    title
+    subtitle "Eliminar regla"
+
+    info "Escribe el SID de la regla que deseas eliminar."
+    printf "\n"
+
+    read -rp "SID: " sid
+
+    if [[ -z "$sid" ]]; then
+        error "No escribiste el SID de la regla."
+        pause
+        return
+    fi
+
+    info "Eliminando regla..."
+    printf "\n"
+
+    sudo sed -i "/sid:$sid/d" "$LOCAL_RULES"
+
+    if [[ $? -eq 0 ]]; then
+        ok "Regla eliminada."
+    else
+        error "No se pudo eliminar la regla."
+    fi
+
     printf "\n"
     info "Reiniciando Suricata para aplicar cambios..."
-
     if sudo systemctl restart suricata; then
         ok "Suricata reiniciado correctamente."
     else
-        error "La regla se agregó, pero Suricata no pudo reiniciarse."
+        error "La regla se eliminó, pero Suricata no pudo reiniciarse."
     fi
 
     pause
@@ -337,6 +475,98 @@ editar_rules_manual() {
     pause
 }
 
+test_aplicar() {
+    clear
+    logo
+    title
+    subtitle "Testear y aplicar reglas"
+
+    info "Probando configuración después de editar reglas..."
+    printf "\n"
+
+    if sudo suricata -T -c "$SURICATA_CONF" -v | awk '/Notice: suricata: Configuration provided was successfully loaded. Exiting./ { print $3 " " $5 " " $6 " " $7 }'; then
+        printf "\n"
+        ok "Configuración aprobada."
+        info "Reiniciando Suricata para aplicar cambios..."
+        if sudo systemctl restart suricata; then
+            ok "Suricata reiniciado correctamente."
+        else
+            error "La regla se agregó, pero Suricata no pudo reiniciarse."
+        fi
+    else
+        printf "\n"
+        error "Hay un problema en la configuración o en alguna regla."
+    fi
+
+    pause
+}
+
+menu_reglas() {
+    while true; do
+        clear
+        logo
+        title
+
+        printf "\n%b\n" "${BOLD}${MAGENTA}                    MENU DE REGLAS${RESET}"
+        small_line
+        option "1" "Ver todas las reglas"
+        option "2" "Ver reglas activas"
+        option "3" "Ver reglas inactivas"
+        option "4" "Agregar regla"
+        option "5" "Eliminar regla"
+        option "6" "Configurar manualmente"
+        option "7" "Testear y aplicar reglas"
+
+        danger_option "0" "Volver al menú principal"
+        small_line
+        printf "\n"
+
+        read -rp "Selecciona una opción: " opcion1
+
+        case "$opcion1" in
+            1)
+                ver_todas_reglas
+                ;;
+            2)
+                ver_reglas_activas
+                ;;
+            3)
+                ver_reglas_inactivas
+                ;;
+            4)
+                agregar_regla
+                ;;
+            5)
+                eliminar_regla
+                ;;
+            6)
+                editar_rules_manual
+                ;;
+            7)
+                test_aplicar
+                ;;
+            0)
+                break
+                ;;
+            *)
+                error "Opción inválida."
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+siguiente_sid() {
+    ultimo_sid=$(sudo grep -Eo 'sid:[0-9]+' "$LOCAL_RULES" 2>/dev/null | cut -d':' -f2 | sort -n | tail -n 1)
+
+    if [[ -z "$ultimo_sid" ]]; then
+        echo "1000001"
+    else
+        echo $((ultimo_sid + 1))
+    fi
+}
+
+
 main_menu() {
     while true; do
         clear
@@ -345,12 +575,11 @@ main_menu() {
 
         printf "\n%b\n" "${BOLD}${WHITE}Selecciona una acción:${RESET}"
         small_line
-        option "1" "Ver estado de Suricata"
-        option "2" "Reiniciar Suricata"
-        option "3" "Test Suricata"
-        option "4" "Ver reglas"
-        option "5" "Agregar regla"
-        option "6" "Modificar archivo rules manualmente"
+        option "1" "Status de Suricata"
+        option "2" "Reglas Suricata"
+        option "3" "Logs Suricata"
+        option "4" "Advertencias"
+        option "5" "Configuración"
         danger_option "0" "Salir"
         small_line
         printf "\n"
@@ -359,27 +588,22 @@ main_menu() {
 
         case "$opcion" in
             1)
-                ver_estado
+                status_suricata
                 ;;
             2)
-                reiniciar_suricata
-                ;;
-            3)
-                test_suricata
-                ;;
-            4)
                 menu_reglas
                 ;;
-            5)
-                agregar_regla
+            3)
+                logs_menu
                 ;;
-            6)
-                editar_rules_manual
+            4)
+                advertencias
+                ;;
+            5)
+                editar_configuracion
                 ;;
             0)
                 clear
-                logo
-                title
                 ok "Saliendo de surictl."
                 exit 0
                 ;;
