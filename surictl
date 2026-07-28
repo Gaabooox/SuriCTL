@@ -1425,8 +1425,24 @@ dashboard_inicio() {
 
     interfaz=$(sudo suricata --dump-config 2>/dev/null | grep "af-packet.0.interface" | awk '{print $3}')
 
+    if [[ -z "$interfaz" ]]; then
+        interfaz="No detectada"
+    fi
+
 
     reglas=$(sudo suricata --dump-config 2>/dev/null | grep "rule-files" -A20 | grep ".rules" | wc -l)
+
+
+    estado=$(systemctl is-active suricata 2>/dev/null)
+
+    if [[ "$estado" == "active" ]]; then
+        estado_color="${GREEN}ACTIVO${RESET}"
+    else
+        estado_color="${RED}$estado${RESET}"
+    fi
+
+
+    uptime=$(systemctl show suricata --property=ActiveEnterTimestamp 2>/dev/null | cut -d'=' -f2)
 
 
     if [[ -f "$EVE_LOG" ]]; then
@@ -1435,11 +1451,26 @@ dashboard_inicio() {
 
         alertas=$(sudo grep -c '"event_type":"alert"' "$EVE_LOG")
 
+
+        ultima_alerta=$(sudo grep '"event_type":"alert"' "$EVE_LOG" | tail -1 | jq -r '.alert.signature' 2>/dev/null)
+
+        if [[ -z "$ultima_alerta" ]]; then
+            ultima_alerta="Sin alertas"
+        fi
+
     else
 
         eventos=0
         alertas=0
+        ultima_alerta="EVE no disponible"
 
+    fi
+
+
+    memoria=$(ps -C suricata -o %mem= 2>/dev/null | awk '{print $1}')
+
+    if [[ -z "$memoria" ]]; then
+        memoria="0"
     fi
 
 
@@ -1447,25 +1478,48 @@ dashboard_inicio() {
     logo
     title
 
-    printf "\n"
-
-    small_line
-
-    printf "%b\n" "${BOLD}${WHITE} INFORMACIÓN DEL SISTEMA ${RESET}"
-
-    small_line
-
-    printf "%b\n" "${BOLD}Versión:${RESET}        ${CYAN}$version${RESET}"
-    printf "%b\n" "${BOLD}Modo:${RESET}           ${GREEN}$modo${RESET}"
-    printf "%b\n" "${BOLD}Interfaz:${RESET}       ${BLUE}$interfaz${RESET}"
-    printf "%b\n" "${BOLD}Reglas:${RESET}         ${MAGENTA}$reglas cargadas${RESET}"
 
     printf "\n"
 
     small_line
 
-    printf "%b\n" "${BOLD}Eventos EVE:${RESET}    ${CYAN}$eventos${RESET}"
-    printf "%b\n" "${BOLD}Alertas:${RESET}        ${RED}$alertas${RESET}"
+    printf "%b\n" "${BOLD}${WHITE}                 DASHBOARD SURICATA${RESET}"
+
+    small_line
+
+
+    printf "%b\n" "${BOLD}Servicio:${RESET}        $estado_color"
+    printf "%b\n" "${BOLD}Versión:${RESET}         ${CYAN}$version${RESET}"
+    printf "%b\n" "${BOLD}Modo:${RESET}            ${WHITE}$modo${RESET}"
+    printf "%b\n" "${BOLD}Interfaz:${RESET}        ${WHITE}$interfaz${RESET}"
+
+
+    printf "\n"
+
+    small_line
+
+
+    printf "%b\n" "${BOLD}Reglas cargadas:${RESET}  ${WHITE}$reglas${RESET}"
+    printf "%b\n" "${BOLD}Eventos EVE:${RESET}     ${WHITE}$eventos${RESET}"
+    printf "%b\n" "${BOLD}Alertas:${RESET}         ${WHITE}$alertas${RESET}"
+
+
+    printf "\n"
+
+    small_line
+
+
+    printf "%b\n" "${BOLD}Última alerta:${RESET}"
+    printf "%b\n" "${DIM}$ultima_alerta${RESET}"
+
+
+    printf "\n"
+
+    small_line
+
+
+    printf "%b\n" "${BOLD}Memoria Suricata:${RESET} ${WHITE}${memoria}%${RESET}"
+
 
     small_line
 
