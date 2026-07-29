@@ -1,28 +1,16 @@
 {
     "192.168.1.219": {
-        "total_eventos": 732,
-        "primer_evento": "2026-07-26T15:05:11.175829-0500",
-        "ultimo_evento": "2026-07-26T15:15:15.454351-0500",
+        "total_eventos": 2,
+        "primer_evento": "2026-07-29T17:35:41.952874-0500",
+        "ultimo_evento": "2026-07-29T17:36:34.349315-0500",
         "ataques": {
             "SSH - Intento de autenticacion": {
-                "cantidad": 377,
+                "cantidad": 2,
                 "horas": {
-                    "15:00": 377
+                    "17:00": 2
                 },
                 "destinos": [
-                    "192.168.1.221"
-                ],
-                "protocolos": [
-                    "TCP"
-                ]
-            },
-            "SSH - Posible fuerza bruta": {
-                "cantidad": 355,
-                "horas": {
-                    "15:00": 355
-                },
-                "destinos": [
-                    "192.168.1.221"
+                    "192.168.1.153"
                 ],
                 "protocolos": [
                     "TCP"

@@ -1,0 +1,8 @@
+{
+    "192.168.1.219": {
+        "ip_origen": "192.168.1.219",
+        "nivel_riesgo_actual": "BAJO",
+        "amenazas_detectadas": [],
+        "cantidad_amenazas": 0
+    }
+}

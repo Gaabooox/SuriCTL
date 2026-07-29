@@ -1,0 +1,26 @@
+[
+    {
+        "fecha_reporte": "2026-07-29 17:58:46",
+        "ip_origen": "192.168.1.219",
+        "riesgo": "BAJO",
+        "resumen": "La IP 192.168.1.219 generó actividad sospechosa sin amenazas críticas detectadas.",
+        "periodo": {
+            "inicio": "2026-07-29T17:35:41.952874-0500",
+            "fin": "2026-07-29T17:36:34.349315-0500",
+            "duracion_segundos": 52
+        },
+        "estadisticas": {
+            "total_eventos": 2
+        },
+        "servicios_afectados": [
+            "SSH"
+        ],
+        "patrones": [
+            "Actividad sospechosa detectada"
+        ],
+        "amenazas": [],
+        "recomendaciones": [
+            "Mantener monitoreo activo"
+        ]
+    }
+]

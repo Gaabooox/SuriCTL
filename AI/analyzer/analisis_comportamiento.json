@@ -1,0 +1,47 @@
+{
+    "192.168.1.219": {
+        "ip_origen": "192.168.1.219",
+        "periodo_actividad": {
+            "inicio": "2026-07-29T17:35:41.952874-0500",
+            "fin": "2026-07-29T17:36:34.349315-0500",
+            "duracion_segundos": 52
+        },
+        "estadisticas": {
+            "total_eventos": 2
+        },
+        "ataques_detectados": {
+            "SSH - Intento de autenticacion": {
+                "cantidad": 2,
+                "horas": {
+                    "17:00": 2
+                },
+                "destinos": [
+                    "192.168.1.153"
+                ],
+                "protocolos": [
+                    "TCP"
+                ]
+            }
+        },
+        "servicios_detectados": [
+            "SSH"
+        ],
+        "protocolos": [
+            "TCP"
+        ],
+        "indicadores": {
+            "cantidad_eventos": 2,
+            "velocidad_eventos_segundo": 0.04,
+            "multiples_servicios": false,
+            "actividad_rapida": false,
+            "alta_frecuencia": false
+        },
+        "nivel_riesgo": "BAJO",
+        "patrones": [
+            "Actividad sospechosa detectada"
+        ],
+        "recomendaciones": [
+            "Mantener monitoreo activo"
+        ]
+    }
+}

@@ -66,13 +66,6 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 
-info "Comprobando sistema..."
-
-
-if [[ ! -f /etc/fedora-release ]]; then
-    warn "Sistema diferente a Fedora detectado."
-    warn "El instalador fue diseñado principalmente para Fedora."
-fi
 
 
 # ========= DEPENDENCIAS =========
@@ -90,7 +83,7 @@ else
     echo ""
     echo "Instálalo con:"
     echo ""
-    echo "sudo dnf install suricata"
+    echo "sudo apt install suricata"
     exit 1
 
 fi
