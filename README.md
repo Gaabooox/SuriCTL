@@ -79,11 +79,14 @@ surictl/
 
 # ⚙️ Requisitos
 
-- Fedora Linux
+- Linux: **Debian**, **Arch** o **Fedora** (y sus derivados)
 - Bash
 - Suricata
 - jq
 - systemd
+
+> El instalador detecta tu distribución automáticamente y usa el gestor de
+> paquetes correcto para instalar las dependencias faltantes.
 
 ---
 
@@ -92,9 +95,9 @@ surictl/
 Clonar el repositorio:
 
 ```bash
-git clone https://github.com/TU_USUARIO/surictl.git
+git clone https://github.com/Gaabooox/SuriCTL.git
 
-cd surictl
+cd SuriCTL
 ```
 
 Dar permisos:
@@ -108,6 +111,17 @@ Instalar:
 ```bash
 sudo ./install.sh
 ```
+
+El instalador detecta el sistema automáticamente:
+
+| Distribución | Gestor de paquetes |
+|--------------|-------------------|
+| Debian, Ubuntu, Mint, Kali | `apt` |
+| Arch, Manjaro, CachyOS | `pacman` |
+| Fedora, CentOS, Rocky | `dnf` |
+
+Si Suricata o `jq` no están instalados, los instala por ti. En distros no
+soportadas, te indica los comandos manuales.
 
 ---
 

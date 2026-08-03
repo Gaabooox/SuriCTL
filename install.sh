@@ -52,6 +52,85 @@ INSTALL_PATH="/usr/local/bin/surictl"
 CURRENT_DIR="$(pwd)"
 SOURCE_FILE="$CURRENT_DIR/surictl"
 
+DISTRO=""
+PKG_MANAGER=""
+INSTALL_CMD=""
+
+
+# ========= DETECCION DE SISTEMA =========
+
+# Detecta la distro (Debian, Arch, Fedora y sus derivados)
+# y elige el gestor de paquetes correcto.
+detectar_distro() {
+    local distro_id=""
+    local like=""
+
+    if [[ -f /etc/os-release ]]; then
+        . /etc/os-release
+        distro_id="${ID:-}"
+        like="${ID_LIKE:-}"
+    fi
+
+    case "$distro_id" in
+        debian|ubuntu|linuxmint|kali|pop|elementary|zorin)
+            DISTRO="Debian (o derivado)"
+            PKG_MANAGER="apt"
+            INSTALL_CMD="apt install -y"
+            ;;
+        arch|manjaro|endeavouros|cachyos|garuda)
+            DISTRO="Arch (o derivado)"
+            PKG_MANAGER="pacman"
+            INSTALL_CMD="pacman -S --noconfirm"
+            ;;
+        fedora|centos|rhel|rocky|almalinux)
+            DISTRO="Fedora (o derivado)"
+            PKG_MANAGER="dnf"
+            INSTALL_CMD="dnf install -y"
+            ;;
+        *)
+            case "$like" in
+                *debian*)
+                    DISTRO="Debian (o derivado)"
+                    PKG_MANAGER="apt"
+                    INSTALL_CMD="apt install -y"
+                    ;;
+                *arch*)
+                    DISTRO="Arch (o derivado)"
+                    PKG_MANAGER="pacman"
+                    INSTALL_CMD="pacman -S --noconfirm"
+                    ;;
+                *fedora*|*rhel*)
+                    DISTRO="Fedora (o derivado)"
+                    PKG_MANAGER="dnf"
+                    INSTALL_CMD="dnf install -y"
+                    ;;
+                *)
+                    return 1
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+# Instala un paquete con el gestor detectado.
+instalar() {
+    local pkg="$1"
+    info "Instalando $pkg con $PKG_MANAGER..."
+
+    # shellcheck disable=SC2086
+    if $INSTALL_CMD "$pkg"; then
+        ok "$pkg instalado correctamente."
+        return 0
+    fi
+
+    error "No se pudo instalar $pkg."
+    echo ""
+    warn "Inténtalo manualmente:"
+    echo ""
+    printf "%b\n" "${GREEN}sudo $INSTALL_CMD $pkg${RESET}"
+    return 1
+}
+
 
 # ========= VALIDACIONES =========
 
@@ -66,6 +145,17 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 
+if ! detectar_distro; then
+    error "No se pudo detectar una distro soportada."
+    echo ""
+    echo "SuricTL soporta: Debian (apt), Arch (pacman) y Fedora (dnf)."
+    echo "En tu distro, instala manualmente 'suricata' y 'jq', y vuelve a ejecutar este instalador."
+    exit 1
+fi
+
+info "Sistema detectado: $DISTRO"
+ok "Gestor de paquetes: $PKG_MANAGER"
+echo ""
 
 
 # ========= DEPENDENCIAS =========
@@ -81,10 +171,12 @@ else
 
     error "Suricata no está instalado."
     echo ""
-    echo "Instálalo con:"
+    warn "Instalando Suricata automáticamente con $PKG_MANAGER..."
     echo ""
-    echo "sudo apt install suricata"
-    exit 1
+
+    if ! instalar "suricata"; then
+        exit 1
+    fi
 
 fi
 
@@ -100,14 +192,8 @@ if command -v jq >/dev/null 2>&1; then
 else
 
     warn "jq no encontrado."
-    info "Instalando jq..."
 
-    dnf install -y jq
-
-    if command -v jq >/dev/null 2>&1; then
-        ok "jq instalado correctamente."
-    else
-        error "No se pudo instalar jq."
+    if ! instalar "jq"; then
         exit 1
     fi
 
